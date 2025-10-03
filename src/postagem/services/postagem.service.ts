@@ -58,7 +58,9 @@ export class PostagemService {
 
     async delete(id: number): Promise<DeleteResult> {
         
-        await this.findById(id)
+        await this.findById(id);
+
+        return await this.postagemRepository.delete(id);
 
         return await this.postagemRepository.delete(id)
     }
