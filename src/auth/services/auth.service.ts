@@ -1,54 +1,47 @@
 import { JwtService } from '@nestjs/jwt';
-import { UsuarioService } from './../../usuario/services/usuario.service';
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { Bcrypt } from '../bcrypt/bcrypt';
-import { UsuarioLogin } from '../entities/usuariologin.entity';
-
+import { ClienteService } from 'src/cliente/services/cliente.service';
+import { ClienteLogin } from '../entities/clientelogin.entity';
 
 @Injectable()
-export class AuthService{
+export class AuthService {
     constructor(
-        private usuarioService: UsuarioService,
+        private clienteService: ClienteService,
         private jwtService: JwtService,
         private bcrypt: Bcrypt
-    ){ }
+    ) { }
 
-    async validateUser(username: string, password: string): Promise<any>{
+    async validateUser(email: string, senha: string): Promise<any> {
+        const buscaCliente = await this.clienteService.findByEmail(email);
 
-        const buscaUsuario = await this.usuarioService.findByUsuario(username);
+        if (!buscaCliente)
+            throw new HttpException('E-mail não encontrado!', HttpStatus.NOT_FOUND);
 
-        if(!buscaUsuario)
-            throw new HttpException('Usuário não encontrado!', HttpStatus.NOT_FOUND)
+        const matchPassword = await this.bcrypt.compararSenhas(senha, buscaCliente.senha);
 
-        const matchPassword = await this.bcrypt.compararSenhas(password, buscaUsuario.senha);
-
-        if(buscaUsuario && matchPassword){
-            const { senha, ...resposta } = buscaUsuario;
+        if (buscaCliente && matchPassword) {
+            const { senha, ...resposta } = buscaCliente;
             return resposta;
         }
 
-        return null
-
+        return null;
     }
 
-    async login(usuarioLogin: UsuarioLogin){
+    async login(clienteLogin: ClienteLogin) {
+        const cliente = await this.validateUser(clienteLogin.email, clienteLogin.senha);
 
-        const payload = { sub: usuarioLogin.usuario };
-
-        const buscaUsuario = await this.usuarioService.findByUsuario(usuarioLogin.usuario);
-
-        if (!buscaUsuario) {
-            throw new HttpException('Usuário não encontrado!', HttpStatus.NOT_FOUND);
+        if (!cliente) {
+            throw new HttpException('E-mail ou senha inválidos!', HttpStatus.UNAUTHORIZED);
         }
 
-        return{
-            id: buscaUsuario.id,
-            nome: buscaUsuario.nome,
-            usuario: usuarioLogin.usuario,
-            senha: '',
-            foto: buscaUsuario.foto,
+        const payload = { sub: cliente.email };
+
+        return {
+            id_cliente: cliente.id_cliente,
+            nome: cliente.nome,
+            email: cliente.email,
             token: `Bearer ${this.jwtService.sign(payload)}`,
-        }
-
+        };
     }
 }
